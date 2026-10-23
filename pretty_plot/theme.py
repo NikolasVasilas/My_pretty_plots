@@ -308,13 +308,17 @@ _MODES = {
             "savefig.bbox": "tight",
         },
     },
-    # Journal figures: sized for a single column (~3.5 in) so text comes out
-    # at 9-10 pt, i.e. body-text size, with no rescaling (``width='page'``
-    # for a full-width figure at the same text size). Serif + STIX maths to match the
-    # page, normal weight, thin lines, inward ticks on all four sides with
-    # minor ticks (the astro convention), frameless legend, vector-friendly
-    # export with embedded TrueType fonts (what journals ask for).
+    # Journal figures. Designed at the printed size -- a single column
+    # (~3.5 in) with 9-10 pt text, i.e. body-text size -- then drawn ``scale``
+    # times bigger (figure, fonts, lines, ticks alike): the file is a 7 in
+    # figure with 20 pt text that LaTeX shrinks back with
+    # ``\includegraphics[width=\columnwidth]``, giving exact 10 pt text and
+    # twice the pixel detail. Serif + STIX maths to match the page, normal
+    # weight, thin lines, inward ticks on all four sides with minor ticks (the
+    # astro convention), frameless legend, vector-friendly export with
+    # embedded TrueType fonts (what journals ask for).
     "paper": {
+        "scale": 2.0,
         "sizes": {
             "font.size": 10,
             "axes.titlesize": 10,
@@ -358,10 +362,10 @@ _MODES = {
             "legend.fancybox": False,   # square corners if frame=True
             "legend.borderpad": 0.3,
             "legend.handlelength": 1.5,
-            # Sharp notebook preview (a 3.5 in figure at the default 100 dpi
-            # is a tiny 350 px image). Saved files: PDF (vector, never
-            # blurry) when no extension is given; PNG fallback at 600 dpi so
-            # it survives being enlarged ~2x in LaTeX.
+            # Notebook preview: 200 dpi at the printed size, i.e. 100 dpi once
+            # ``scale`` (x2) has been applied -> ~700 px wide. Saved files:
+            # PDF (vector, never blurry) when no extension is given; PNG
+            # fallback at 600 dpi of the (2x) file = 1200 dpi when printed.
             "figure.dpi": 200,
             "savefig.format": "pdf",
             "savefig.dpi": 600,
@@ -379,6 +383,45 @@ _WIDTHS = {
     "column": 3.5, "single": 3.5,
     "page": 7.1, "double": 7.1, "full": 7.1, "textwidth": 7.1,
 }
+
+# Size-like rcParams (points) that ``scale`` multiplies along with the figure
+# size and the font sizes, so a scaled figure looks the same, just bigger.
+_SCALED_KEYS = (
+    "lines.linewidth", "lines.markersize", "lines.markeredgewidth",
+    "errorbar.capsize", "axes.linewidth", "patch.linewidth", "grid.linewidth",
+    "hatch.linewidth", "axes.titlepad", "axes.labelpad",
+    "xtick.major.width", "ytick.major.width", "xtick.minor.width", "ytick.minor.width",
+    "xtick.major.size", "ytick.major.size", "xtick.minor.size", "ytick.minor.size",
+    "xtick.major.pad", "ytick.major.pad", "xtick.minor.pad", "ytick.minor.pad",
+    "savefig.pad_inches",
+)
+# Font-size rcParams (scaled too; string sizes like 'large' follow font.size).
+_FONT_KEYS = tuple(_BASE_SIZES)
+
+# ``resolution=`` presets: dpi of saved raster files (PNG / JPG, and images
+# inside a PDF). Vector output (PDF / SVG) is sharp at any size regardless.
+RESOLUTIONS = {"low": 100, "medium": 300, "high": 600, "very_high": 1200}
+_RESOLUTION_ALIASES = {
+    "median": "medium", "med": "medium", "mid": "medium", "normal": "medium",
+    "very high": "very_high", "veryhigh": "very_high", "very-high": "very_high",
+    "vhigh": "very_high", "ultra": "very_high", "max": "very_high",
+    "draft": "low", "lo": "low", "hi": "high",
+}
+
+
+def _resolve_resolution(resolution):
+    """Preset name or number -> savefig dpi."""
+    if isinstance(resolution, (int, float)) and not isinstance(resolution, bool):
+        if resolution <= 0:
+            raise ValueError(f"resolution must be > 0, got {resolution!r}")
+        return resolution
+    key = str(resolution).strip().lower().replace("_", " ")
+    key = _RESOLUTION_ALIASES.get(key, key).replace(" ", "_")
+    if key not in RESOLUTIONS:
+        raise ValueError(f"unknown resolution {resolution!r}; use one of "
+                         f"{list(RESOLUTIONS)} (or 'median') or a dpi number")
+    return RESOLUTIONS[key]
+
 
 # Mode set by the last ``apply_plot_theme`` call (``None`` before any). The
 # legend size check reads this rather than guessing from rcParams, so a hand
@@ -467,7 +510,7 @@ def _with_font(font, default_stack):
 
 
 def theme_config(theme=DEFAULT_THEME, font_scale=1.0, usetex=False, font=None,
-                 mode=DEFAULT_MODE, width=None):
+                 mode=DEFAULT_MODE, width=None, scale=None, resolution=None):
     """Build the rcParams for a theme and return them -- **without applying**.
 
     This is the single source of truth for what a theme looks like;
@@ -503,11 +546,26 @@ def theme_config(theme=DEFAULT_THEME, font_scale=1.0, usetex=False, font=None,
         slides; ``'paper'`` sizes text for a single journal column, in serif.
         Independent of ``theme``.
     width : float or {'column', 'page'}, optional
-        Default figure width, in inches or by name (``'column'`` = 3.5 in,
-        ``'page'`` = 7.1 in; ``'single'`` / ``'double'`` also work). The
-        mode's aspect ratio is kept and font sizes are **not** changed --
-        make the figure at the width it is printed at, then include it in
-        LaTeX without rescaling. ``None`` keeps the mode's default.
+        Width the figure is **printed / shown** at, in inches or by name
+        (``'column'`` = 3.5 in, ``'page'`` = 7.1 in; ``'single'`` /
+        ``'double'`` also work). The mode's aspect ratio is kept and font
+        sizes are **not** changed. The file itself is ``width x scale`` wide.
+        ``None`` keeps the mode's default.
+    scale : float, optional
+        Draw everything -- figure size, fonts, line widths, markers, ticks,
+        paddings -- this many times bigger, so the figure looks identical,
+        just larger (more detail when shrunk back in LaTeX / on a slide).
+        ``None`` = the mode's default: ``2`` in ``paper`` (include with
+        ``\\includegraphics[width=\\columnwidth]`` / ``[width=\\textwidth]``
+        to get the designed 10 pt text), ``1`` otherwise. ``scale=1`` in
+        ``paper`` gives a figure meant to be included at natural size.
+    resolution : {'low', 'medium', 'high', 'very_high'} or float, optional
+        dpi of saved raster files (``savefig.dpi``): ``'low'`` = 100,
+        ``'medium'`` (or ``'median'``) = 300, ``'high'`` = 600,
+        ``'very_high'`` = 1200, or a number. Matters for PNG / JPG (and
+        images / ``rasterized=True`` parts inside a PDF); PDF / SVG lines
+        and text are vector and sharp at any size anyway. ``None`` = the
+        mode's default (600 in ``paper``, 200 in ``presenter``).
     """
     spec = _THEMES[_resolve(theme)]
     style, fg, bg, cycle = spec["style"], spec["fg"], spec["bg"], spec["cycle"]
@@ -568,6 +626,21 @@ def theme_config(theme=DEFAULT_THEME, font_scale=1.0, usetex=False, font=None,
         w = _resolve_width(width)
         rc["figure.figsize"] = (w, w * h0 / w0)
 
+    k = mode_spec.get("scale", 1.0) if scale is None else float(scale)
+    if k <= 0:
+        raise ValueError(f"scale must be > 0, got {scale!r}")
+    if k != 1:
+        w, h = rc.get("figure.figsize", mpl.rcParamsDefault["figure.figsize"])
+        rc["figure.figsize"] = (w * k, h * k)
+        for key in (*_FONT_KEYS, *_SCALED_KEYS):
+            v = rc.get(key, mpl.rcParamsDefault[key])
+            if isinstance(v, (int, float)) and not isinstance(v, bool):
+                rc[key] = v * k
+        # Same on-screen size in the notebook as the unscaled figure.
+        rc["figure.dpi"] = rc.get("figure.dpi", mpl.rcParamsDefault["figure.dpi"]) / k
+    if resolution is not None:
+        rc["savefig.dpi"] = _resolve_resolution(resolution)
+
     # A caller-supplied ``font`` goes to the front of whichever stack ends up
     # active (sans by default, mono for ``matrix``, serif in ``paper`` mode).
     family = rc["font.family"]
@@ -577,7 +650,8 @@ def theme_config(theme=DEFAULT_THEME, font_scale=1.0, usetex=False, font=None,
 
 
 def apply_plot_theme(theme=DEFAULT_THEME, font_scale=1.0, usetex=False, font=None,
-                     mode=DEFAULT_MODE, width=None, glow=False):
+                     mode=DEFAULT_MODE, width=None, glow=False, scale=None,
+                     resolution=None):
     """Apply a plot theme via matplotlib rcParams.
 
     Thin wrapper over :func:`theme_config`: selects the base style, then pushes
@@ -608,6 +682,9 @@ def apply_plot_theme(theme=DEFAULT_THEME, font_scale=1.0, usetex=False, font=Non
     width : float or {'column', 'page'}, optional
         Default figure width (inches or name), fonts unchanged. See
         :func:`theme_config`.
+    scale, resolution :
+        File size multiplier and saved-raster dpi preset. See
+        :func:`theme_config`.
     glow : bool, float or dict
         Make every line / scatter / error bar glow automatically when drawn
         (see :func:`pretty_plot.glow`). ``True`` = default glow, a number =
@@ -616,7 +693,7 @@ def apply_plot_theme(theme=DEFAULT_THEME, font_scale=1.0, usetex=False, font=Non
         Ignored with a warning in ``paper`` mode.
     """
     cfg = theme_config(theme, font_scale=font_scale, usetex=usetex, font=font,
-                       mode=mode, width=width)
+                       mode=mode, width=width, scale=scale, resolution=resolution)
     # Reset to matplotlib defaults first so switching e.g. paper -> regular
     # does not leave the paper figsize / tick settings behind.
     plt.style.use(["default", cfg.pop("style")])
@@ -677,7 +754,7 @@ def patch_errorbar(fmt="o"):
 
 
 def use(theme=DEFAULT_THEME, patch_errorbars=True, font_scale=1.0, usetex=False, font=None,
-        mode=DEFAULT_MODE, width=None, glow=False):
+        mode=DEFAULT_MODE, width=None, glow=False, scale=None, resolution=None):
     """Apply a theme and (by default) patch ``errorbar`` in one call.
 
     Parameters
@@ -686,14 +763,14 @@ def use(theme=DEFAULT_THEME, patch_errorbars=True, font_scale=1.0, usetex=False,
         Passed to :func:`apply_plot_theme`.
     patch_errorbars : bool
         If true (default), also call :func:`patch_errorbar`.
-    font_scale, usetex, font, mode, width, glow :
+    font_scale, usetex, font, mode, width, glow, scale, resolution :
         Passed straight through to :func:`apply_plot_theme`. Leave ``font`` as
         ``None`` to keep the current-version default; pass a family name (or
         list) to override it. ``mode`` is ``'regular'``, ``'presenter'`` or
         ``'paper'``. ``glow=True`` makes every plot glow (dark themes).
     """
     apply_plot_theme(theme, font_scale=font_scale, usetex=usetex, font=font, mode=mode,
-                     width=width, glow=glow)
+                     width=width, glow=glow, scale=scale, resolution=resolution)
     if patch_errorbars:
         patch_errorbar()
 
@@ -736,16 +813,22 @@ def _detect_theme():
     return None
 
 
+def _is_switch(v):
+    """True for non-numeric settings (strings, bools): unaffected by scale."""
+    return isinstance(v, (str, bool))
+
+
 def _detect_mode():
     """Best-effort name of the mode currently in rcParams.
 
-    A non-regular mode is reported when every one of its settings except
-    font family and figure size is live (so ``paper`` with a custom font or
-    ``width=`` still detects); anything else counts as ``'regular'``.
+    A non-regular mode is reported when every one of its non-numeric
+    settings (except font family) is live, so ``paper`` with a custom font,
+    ``width=``, ``scale=`` or ``resolution=`` still detects; anything else
+    counts as ``'regular'``.
     """
     for name, spec in _MODES.items():
         rc = {k: v for k, v in spec["rc"].items()
-              if k not in ("font.family", "figure.figsize")}
+              if k != "font.family" and _is_switch(v)}
         if rc and all(mpl.rcParams[k] == (list(v) if isinstance(v, tuple) else v)
                       for k, v in rc.items()):
             return name

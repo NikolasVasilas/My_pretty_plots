@@ -99,13 +99,14 @@ settings for where the figure is going. Any theme works with any mode.
 |---|---|---|
 | `regular` (default) | day-to-day notebooks | nothing — exactly the pre-0.5 look |
 | `presenter` | slides / talks | base font 20 (labels 22, ticks 18, title 24), bold, lines 2.8, markers 9, thick spines + ticks, 16:9 figure (8 × 4.5 in), `savefig.dpi=200`, warns about oversized legends |
-| `paper` | journal figures | one-column figure (3.5 × 2.6 in) so text prints at 9–10 pt (body-text size) without rescaling, Times/STIX serif + STIX maths, normal weight, thin lines, inward ticks on all four sides with minor ticks, frameless legend, sharp 200-dpi notebook preview, saves to **PDF** when no extension is given, PNG fallback at 600 dpi, `bbox='tight'`, TrueType fonts embedded (`pdf.fonttype=42`) |
+| `paper` | journal figures | one-column figure drawn at 2× (file 7.0 × 5.2 in, 20 pt text) that prints at 3.5 in with 10 pt text when included with `width=\columnwidth`, Times/STIX serif + STIX maths, normal weight, thin lines, inward ticks on all four sides with minor ticks, frameless legend, sharp 200-dpi notebook preview, saves to **PDF** when no extension is given, PNG fallback at 600 dpi, `bbox='tight'`, TrueType fonts embedded (`pdf.fonttype=42`) |
 
 ```python
 use('dark')                      # regular
 use('tron', mode='presenter')
 use('light', mode='paper')       # papers: pair with 'light'
 use('light', mode='paper', font_scale=1.1)   # still scalable
+use('light', mode='paper', resolution='very_high')   # 1200-dpi PNGs
 ```
 
 Aliases: `'slides'`, `'talk'`, `'presentation'` → `presenter`;
@@ -115,33 +116,57 @@ Aliases: `'slides'`, `'talk'`, `'presentation'` → `presenter`;
 In `paper` mode `font=` goes to the front of the serif stack
 (`DEFAULT_SERIF`).
 
-**Getting paper figures sharp and readable in LaTeX.** Make the figure at the
-width it is printed at, rather than making it small and enlarging it in LaTeX:
+**Getting paper figures sharp and readable in LaTeX.** `paper` mode draws
+the figure **2× larger** than it is printed (file 7.0 × 5.2 in, fonts 20 pt,
+lines, markers and ticks doubled too) and you let LaTeX shrink it to the
+column width. Everything comes out at the right printed size (10 pt text),
+and a PNG keeps twice the pixels of a natural-size figure:
 
 ```python
-use('light', mode='paper')                 # one column, 3.5 in
-use('light', mode='paper', width='page')   # full text width, 7.1 in
+use('light', mode='paper')                 # one column (prints 3.5 in wide)
+use('light', mode='paper', width='page')   # full text width (prints 7.1 in)
 use('light', mode='paper', width=6.3)      # e.g. a thesis \textwidth, in inches
 fig.savefig('lightcurve')                  # -> lightcurve.pdf (vector)
 ```
 
 ```latex
-\includegraphics{lightcurve.pdf}             % natural size, no width=
+\includegraphics[width=\columnwidth]{lightcurve.pdf}   % width='page' -> \textwidth
 ```
 
-`width=` (any mode) sets the default figure width in inches or by name
-(`'column'` / `'single'` = 3.5, `'page'` / `'double'` = 7.1), keeping the
-mode's aspect ratio and **not** changing the font sizes, so text is 9–10 pt in
-print at every width. A PDF is vector, so it never goes blurry; only a PNG
-does when it is enlarged (the 600-dpi default allows about 2× enlargement).
-To find your document's widths, put `\the\columnwidth` / `\the\textwidth` in
-the `.tex` (pt; divide by 72.27 for inches).
+`width=` (any mode) is always the **printed** width in inches or by name
+(`'column'` / `'single'` = 3.5, `'page'` / `'double'` = 7.1); the file is
+`scale` times that. It keeps the mode's aspect ratio and does **not** change
+the font sizes, so text is 10 pt in print at every width. To find your
+document's widths, put `\the\columnwidth` / `\the\textwidth` in the `.tex`
+(pt; divide by 72.27 for inches).
+
+`scale=` changes the drawing factor (`paper` default 2, other modes 1):
+`scale=1` gives the natural-size figure (3.5 × 2.6 in, 10 pt; include it with
+no `width=`), `scale=3` an even bigger one. Fonts, line widths, markers,
+ticks and paddings are all multiplied, so the look never changes; only the
+file gets bigger. It works in any mode (`use('tron', scale=1.5)`).
+Sizes you pass yourself (`figsize=`, `pad=`, `linewidth=`, …) are in file
+units, so in `paper` mode use 2× the printed value: a figure printed at
+7.1 × 2.6 in is `figsize=(14.2, 5.2)`.
+
+**Resolution.** A PDF is vector and is sharp at any zoom whatever the
+resolution. For PNG / JPG output pick `resolution=` (sets `savefig.dpi`):
+
+| `resolution` | dpi | for |
+|---|---|---|
+| `'low'` | 100 | quick drafts, small files |
+| `'medium'` (`'median'`) | 300 | screens, most journals' minimum |
+| `'high'` | 600 | print (the `paper` default) |
+| `'very_high'` | 1200 | line art / zoom-in figures |
+
+Any number works too (`resolution=450`); `pretty_plot.RESOLUTIONS` holds the
+table. `fig.savefig(..., dpi=...)` still overrides it for a single file.
 
 Absolute sizes differ between `paper` and `presenter` because the figures
 end up at different physical sizes (a 3.5 in journal column vs ~60% of a
-13.33 in wide slide), but the text-to-figure ratio is matched (~2.5 pt per inch
-of figure width), so both read at the same relative size. Make the figure at
-the size it will be shown and insert it without rescaling.
+13.33 in wide slide; ratio measured in print, after the 2× shrink), but the text-to-figure ratio is matched (~2.5 pt per inch
+of figure width), so both read at the same relative size. Insert slides at the
+size they were made, paper figures at `width=\columnwidth`.
 
 Applying a theme now resets rcParams to matplotlib defaults first, so switching
 `paper` → `regular` doesn't leave the paper figure size or ticks behind.
@@ -312,10 +337,10 @@ suggested settings and tweak them by hand.
 
 | name | what it does |
 |---|---|
-| `apply_plot_theme(theme='dark', font_scale=1.0, usetex=False, font=None, mode='regular', width=None, glow=False)` | set matplotlib rcParams for a theme (colours, fonts, grid, legend frame) |
+| `apply_plot_theme(theme='dark', font_scale=1.0, usetex=False, font=None, mode='regular', width=None, glow=False, scale=None, resolution=None)` | set matplotlib rcParams for a theme (colours, fonts, grid, legend frame) |
 | `patch_errorbar(fmt='o')` | make `Axes.errorbar` default to `fmt`; idempotent |
-| `use(theme='dark', patch_errorbars=True, font_scale=1.0, usetex=False, font=None, mode='regular', width=None, glow=False)` | `apply_plot_theme` + `patch_errorbar` |
-| `theme_config(theme='dark', font_scale=1.0, usetex=False, font=None, mode='regular', width=None)` | the rcParams a theme *would* apply, returned as a dict (not applied) |
+| `use(theme='dark', patch_errorbars=True, font_scale=1.0, usetex=False, font=None, mode='regular', width=None, glow=False, scale=None, resolution=None)` | `apply_plot_theme` + `patch_errorbar` |
+| `theme_config(theme='dark', font_scale=1.0, usetex=False, font=None, mode='regular', width=None, scale=None, resolution=None)` | the rcParams a theme *would* apply, returned as a dict (not applied) |
 | `current_config(full=False)` | the rcParams in effect right now, + detected `theme` and `errorbar.patched` |
 | `legend(where='inside', ax=None, fig=None, pad=None, frame=None, frame_width=None, **kw)` | legend inside, or outside on a chosen side / alignment, with optional box |
 | `LegendSizeWarning` | warning category for oversized legends in `presenter` mode |
@@ -325,6 +350,7 @@ suggested settings and tweak them by hand.
 | `NEON`, `PASTEL`, `TRON`, `TRON_ORANGE`, `TRON_RED`, `CYBER_PUNK`, `MATRIX` | the per-theme colour-cycle lists |
 | `THEMES` | tuple of canonical theme names |
 | `MODES` | `('regular', 'presenter', 'paper')` |
+| `RESOLUTIONS` | `{'low': 100, 'medium': 300, 'high': 600, 'very_high': 1200}` (dpi) |
 | `DEFAULT_MODE` | `'regular'` |
 | `DEFAULT_THEME` | `'dark'` |
 | `DEFAULT_SANS`, `DEFAULT_MONO`, `DEFAULT_SERIF` | the built-in default font stacks |

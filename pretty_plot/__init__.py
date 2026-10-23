@@ -20,6 +20,7 @@ from .theme import (
     MATRIX,
     MODES,
     NEON,
+    RESOLUTIONS,
     PASTEL,
     THEMES,
     TRON,
@@ -32,7 +33,7 @@ from .theme import (
     use,
 )
 
-__version__ = "0.7.0"
+__version__ = "0.8.0"
 
 __all__ = [
     "__version__",
@@ -42,6 +43,7 @@ __all__ = [
     "DEFAULT_SERIF",
     "THEMES",
     "MODES",
+    "RESOLUTIONS",
     "DEFAULT_MODE",
     "NEON",
     "PASTEL",
