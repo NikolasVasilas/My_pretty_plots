@@ -1,7 +1,7 @@
 """pretty_plot: high-visibility matplotlib themes.
 
 Drop-in matplotlib theming for any project: themes, regular / presenter /
-paper modes, legends outside the plot and neon glow.
+paper modes, legends outside the plot, neon glow and zoomed insets.
 
 Add new modules alongside ``theme.py`` and import them from here; the package is
 meant to be installed editable (``pip install -e``), so edits take effect
@@ -32,8 +32,9 @@ from .theme import (
     theme_config,
     use,
 )
+from .zoom import zoom_inset, zoom_lines
 
-__version__ = "0.8.0"
+__version__ = "0.9.0"
 
 __all__ = [
     "__version__",
@@ -62,4 +63,6 @@ __all__ = [
     "SquashedPlotWarning",
     "glow",
     "GlowWarning",
+    "zoom_inset",
+    "zoom_lines",
 ]

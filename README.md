@@ -333,6 +333,34 @@ layers on first (pop it before `rcParams.update`). It does **not** touch the
 live rcParams — use it to preview or diff a theme, or to grab one theme's
 suggested settings and tweak them by hand.
 
+## Zoomed-in inset
+
+A small plot inside the plot that zooms into one region, with a rectangle on the
+main plot and lines joining it to the inset, between corners **you** choose:
+
+```python
+axins = pp.zoom_inset(ax, xlim=(0.70, 1.01), ylim=(0, 100))      # default corners
+axins.hist(values, bins=bins, histtype='step')                    # draw into the inset
+axins.set_ylim(0, 100)                                            # (plotting may autoscale)
+
+pp.zoom_inset(ax, (0.7, 1.01), (0, 100), corners=['top left', 'top right'])
+pp.zoom_inset(ax, (0.7, 1.01), (0, 100),
+              corners=['top left -> bottom left', 'top right -> bottom right'])
+pp.zoom_inset(ax, (0.7, 1.01), (0, 100), bounds=[0.1, 0.5, 0.4, 0.4])   # inset position
+pp.zoom_lines(axins, 'bottom right', color='red', linestyle='--')       # one more line
+```
+
+- `corners`: one line per entry. `'top left'` joins the same corner of the
+  rectangle and the inset; `'top left -> bottom right'` (or the tuple
+  `('top left', 'bottom right')`) joins the rectangle's top left to the inset's
+  bottom right. Short names work: `'tl'`, `'br'`, `'upper left'`, … Default
+  `['bottom left', 'top right']`; `[]` draws the rectangle only.
+- `bounds=[x0, y0, w, h]`: where the inset sits, in fractions of the main plot.
+- `color=`, `lw=`, `linestyle=`, …: style of the rectangle and lines (default
+  the theme's foreground colour and spine width).
+- The rectangle and lines follow the inset's limits, so a later
+  `axins.set_xlim(...)` moves them too.
+
 ## API
 
 | name | what it does |
@@ -347,6 +375,8 @@ suggested settings and tweak them by hand.
 | `SquashedPlotWarning` | warning category for an outside legend that leaves the plot < 50% of the figure |
 | `glow(target=None, strength=1, size=None, layers=8, errorbars=1, markers=1, color=None, points=None, force=False)` | neon glow on a figure / axes / single artists / some points |
 | `GlowWarning` | warning category: glow skipped in `paper` mode, or used on a light background |
+| `zoom_inset(ax, xlim, ylim, bounds=(0.41, 0.44, 0.45, 0.45), corners=('bottom left', 'top right'), axins=None, color=None, lw=None, **kw)` | zoomed-in inset with connecting lines between chosen corners; returns the inset |
+| `zoom_lines(axins, corners, **kw)` | add connecting lines to an inset from `zoom_inset` |
 | `NEON`, `PASTEL`, `TRON`, `TRON_ORANGE`, `TRON_RED`, `CYBER_PUNK`, `MATRIX` | the per-theme colour-cycle lists |
 | `THEMES` | tuple of canonical theme names |
 | `MODES` | `('regular', 'presenter', 'paper')` |

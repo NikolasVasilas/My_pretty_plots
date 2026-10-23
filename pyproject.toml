@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pretty_plot"
-version = "0.8.0"
-description = "High-visibility matplotlib themes (light, dark, tron/tron_orange/tron_red, cyber_punk, matrix) with regular / presenter / paper modes, outside legends and neon glow"
+version = "0.9.0"
+description = "High-visibility matplotlib themes (light, dark, tron/tron_orange/tron_red, cyber_punk, matrix) with regular / presenter / paper modes, outside legends, neon glow and zoomed insets"
 readme = "README.md"
 requires-python = ">=3.9"
 authors = [{ name = "nvasilas", email = "nvsls.2002@gmail.com" }]
